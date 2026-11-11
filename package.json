@@ -1,0 +1,65 @@
+{
+  "name": "@syllables-dev/numeric",
+  "version": "0.1.0",
+  "description": "Faithful SwiftUI numeric text on the web.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/syllables-dev/numeric.git"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/dom/numeric-text.d.ts",
+      "import": "./dist/dom/numeric-text.js"
+    },
+    "./react": {
+      "types": "./dist/react/numeric-text.d.ts",
+      "import": "./dist/react/numeric-text.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/numeric-text.d.ts",
+      "import": "./dist/vue/numeric-text.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/numeric-text.d.ts",
+      "import": "./dist/svelte/numeric-text.js"
+    }
+  },
+  "scripts": {
+    "build": "NODE_ENV=production bun scripts/build.ts",
+    "prepublishOnly": "bun run build",
+    "release": "npm publish --registry=https://registry.npmjs.org && npm publish --registry=https://npm.pkg.github.com",
+    "typecheck": "tsc --noEmit",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "typescript": "^7.0.2",
+    "ultracite": "7.12.2",
+    "vue": "^3.5.45"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "vue": ">=3.4"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
+  "packageManager": "bun@1.4.0"
+}
