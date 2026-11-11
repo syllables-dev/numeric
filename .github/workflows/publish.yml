@@ -1,0 +1,75 @@
+name: publish
+
+on:
+  workflow_run:
+    workflows: [check]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - if: github.ref != 'refs/heads/main'
+        run: echo "publish only runs on main" && exit 1
+
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - id: version
+        run: echo "value=$(bun --print 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - id: npm
+        run: |
+          if npm view "@syllables-dev/numeric@${{ steps.version.outputs.value }}" version > /dev/null 2>&1; then
+            echo "@syllables-dev/numeric@${{ steps.version.outputs.value }} is already on npm"
+          else
+            npm publish --access public
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: "@syllables-dev"
+
+      - env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          if npm view "@syllables-dev/numeric@${{ steps.version.outputs.value }}" version > /dev/null 2>&1; then
+            echo "@syllables-dev/numeric@${{ steps.version.outputs.value }} is already on github packages"
+          else
+            npm publish
+          fi
+
+      - if: steps.npm.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.value }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "v${{ steps.version.outputs.value }}" \
+            --generate-notes
