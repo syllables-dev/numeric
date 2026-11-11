@@ -1,3 +1,5 @@
+import { glyphElement, slotElement, widthOf } from "@/dom/slots";
+import type { Glyph, Slot } from "@/dom/slots";
 import { alignGlyphs, splitGlyphs } from "@/glyphs/align";
 import type { GlyphEdit } from "@/glyphs/align";
 import { springTiming } from "@/transition/spring";
@@ -13,16 +15,6 @@ export type NumericValue = string | readonly NumericRun[];
 
 export interface NumericTextOptions {
   countsDown?: boolean;
-}
-
-interface Glyph {
-  className?: string;
-  text: string;
-}
-
-interface Slot extends Glyph {
-  glyph: HTMLSpanElement;
-  slot: HTMLSpanElement;
 }
 
 interface Change {
@@ -49,39 +41,6 @@ const sameGlyphs = (slots: readonly Slot[], glyphs: readonly Glyph[]) =>
     ({ className, text }, index) =>
       slots[index]?.text === text && slots[index]?.className === className
   );
-
-const glyphElement = ({ className, text }: Glyph) => {
-  const glyph = document.createElement("span");
-  glyph.textContent = text;
-  glyph.className = className ?? "";
-  return glyph;
-};
-
-const slotElement = (...children: HTMLSpanElement[]) => {
-  const slot = document.createElement("span");
-  slot.style.display = "inline-block";
-  slot.style.position = "relative";
-  slot.append(...children);
-  return slot;
-};
-
-const sizerElement = (glyph: HTMLSpanElement) => {
-  const sizer = glyph.cloneNode(true) as HTMLSpanElement;
-  sizer.removeAttribute("style");
-  sizer.style.visibility = "hidden";
-  return sizer;
-};
-
-const float = (glyph: HTMLSpanElement, width: number) => {
-  glyph.style.position = "absolute";
-  glyph.style.top = "0";
-  glyph.style.left = `calc(50% - ${width / 2}px)`;
-  glyph.style.width = `${width}px`;
-  glyph.style.textAlign = "center";
-};
-
-const measure = (element: HTMLElement | undefined) =>
-  element?.getBoundingClientRect() ?? { height: 0, width: 0 };
 
 const reducedMotion = () =>
   typeof matchMedia === "function" &&
@@ -132,30 +91,12 @@ export class NumericText {
       ),
       next
     );
-    const sizers = changes.map(({ entering, leaving, slot }) => {
-      const sizer = sizerElement(entering ?? leaving ?? slot);
-      slot.prepend(sizer);
-      return sizer;
-    });
-
-    for (const { entering, to } of changes) {
-      if (entering) {
-        float(entering, to);
-      }
-    }
-
     this.animateChanges(changes);
     this.cleanup = () => {
-      for (const sizer of sizers) {
-        sizer.remove();
-      }
-
       for (const { entering, leaving, slot } of changes) {
         leaving?.remove();
 
-        if (entering) {
-          entering.removeAttribute("style");
-        } else {
+        if (!entering) {
           slot.remove();
         }
       }
@@ -170,7 +111,7 @@ export class NumericText {
 
   private rebuild(edits: GlyphEdit[], next: Glyph[]) {
     const previous = this.slots;
-    const widths = previous.map(({ slot }) => measure(slot).width);
+    const widths = previous.map(({ slot }) => widthOf(slot));
     const changeCount = edits.filter(({ kind }) => kind !== "keep").length;
     const spread = numericText.stagger * numericText.staggerSeconds * 1000;
     const changes: Change[] = [];
@@ -188,13 +129,8 @@ export class NumericText {
         continue;
       }
 
-      const from = edit.kind === "insert" ? 0 : (widths[edit.previous] ?? 0);
       const entering = glyph && glyphElement(glyph);
       const slot = old?.slot ?? slotElement();
-
-      if (old) {
-        float(old.glyph, from);
-      }
 
       if (entering && glyph) {
         slot.append(entering);
@@ -205,7 +141,7 @@ export class NumericText {
         delay:
           changeCount < 2 ? 0 : (changes.length / (changeCount - 1)) * spread,
         entering,
-        from,
+        from: edit.kind === "insert" ? 0 : (widths[edit.previous] ?? 0),
         leaving: old?.glyph,
         slot,
         to: 0,
@@ -217,7 +153,7 @@ export class NumericText {
     this.slots = slots;
     return changes.map((change) => ({
       ...change,
-      to: measure(change.entering).width,
+      to: widthOf(change.entering),
     }));
   }
 
@@ -225,7 +161,7 @@ export class NumericText {
     const motion = !reducedMotion();
     const fade = springTiming(fadeSpring);
     const rise = springTiming(offsetSpring);
-    const blur = `blur(${(numericText.blur * measure(this.glyphs).height) / 2}px)`;
+    const blur = `blur(${(numericText.blur * this.glyphs.getBoundingClientRect().height) / 2}px)`;
     const travel = (this.countsDown ? -1 : 1) * numericText.offset * 100;
     const hidden = motion
       ? { filter: blur, opacity: 0, scale: numericText.scale }
