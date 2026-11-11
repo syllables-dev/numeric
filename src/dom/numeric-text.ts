@@ -80,10 +80,7 @@ export class NumericText {
       ),
       next
     );
-    this.animations = animateChanges(changes, {
-      countsDown: this.countsDown,
-      lineHeight: this.glyphs.getBoundingClientRect().height,
-    });
+    this.animations = animateChanges(changes, this.countsDown);
     this.cleanup = () => {
       for (const { entering, leaving, slot } of changes) {
         leaving?.remove();
