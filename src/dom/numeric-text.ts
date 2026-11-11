@@ -4,7 +4,6 @@ import { glyphElement, slotElement, widthOf } from "@/dom/slots";
 import type { Glyph, Slot } from "@/dom/slots";
 import { alignGlyphs, splitGlyphs } from "@/glyphs/align";
 import type { GlyphEdit } from "@/glyphs/align";
-import { numericText } from "@/transition/swiftui";
 
 export interface NumericRun {
   className?: string;
@@ -80,7 +79,10 @@ export class NumericText {
       ),
       next
     );
-    this.animations = animateChanges(changes, this.countsDown);
+    this.animations = animateChanges(changes, {
+      countsDown: this.countsDown,
+      rtl: getComputedStyle(this.glyphs).direction === "rtl",
+    });
     this.cleanup = () => {
       for (const { entering, leaving, slot } of changes) {
         leaving?.remove();
@@ -101,8 +103,6 @@ export class NumericText {
   private rebuild(edits: GlyphEdit[], next: Glyph[]) {
     const previous = this.slots;
     const widths = previous.map(({ slot }) => widthOf(slot));
-    const changeCount = edits.filter(({ kind }) => kind !== "keep").length;
-    const spread = numericText.stagger * numericText.staggerSeconds * 1000;
     const changes: Change[] = [];
     const slots: Slot[] = [];
     const order: HTMLSpanElement[] = [];
@@ -127,8 +127,6 @@ export class NumericText {
       }
 
       changes.push({
-        delay:
-          changeCount < 2 ? 0 : (changes.length / (changeCount - 1)) * spread,
         entering,
         from: edit.kind === "insert" ? 0 : (widths[edit.previous] ?? 0),
         leaving: old?.glyph,

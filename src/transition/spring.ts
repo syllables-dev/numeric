@@ -1,5 +1,6 @@
 export interface Spring {
   damping: number;
+  duration: number;
   mass: number;
   stiffness: number;
 }
@@ -9,9 +10,7 @@ export interface SpringTiming {
   easing: string;
 }
 
-const restThreshold = 0.001;
 const sampleRate = 60;
-const maxSeconds = 10;
 const timings = new Map<string, SpringTiming>();
 
 export const springPosition = (
@@ -45,41 +44,27 @@ export const springPosition = (
   );
 };
 
-export const settlingSeconds = (spring: Spring) => {
-  const step = 1 / (sampleRate * 4);
-  let settled = maxSeconds;
-
-  for (let seconds = maxSeconds; seconds >= 0; seconds -= step) {
-    if (Math.abs(springPosition(spring, seconds) - 1) > restThreshold) {
-      return Math.min(settled, maxSeconds);
-    }
-    settled = seconds;
-  }
-
-  return 0;
-};
-
 export const springTiming = (spring: Spring): SpringTiming => {
-  const key = `${spring.stiffness}:${spring.damping}:${spring.mass}`;
+  const key = `${spring.stiffness}:${spring.damping}:${spring.mass}:${spring.duration}`;
   const cached = timings.get(key);
 
   if (cached) {
     return cached;
   }
 
-  const seconds = settlingSeconds(spring);
-  const count = Math.max(2, Math.ceil(seconds * sampleRate) + 1);
+  const count = Math.max(2, Math.ceil(spring.duration * sampleRate) + 1);
   const stops = Array.from({ length: count }, (_, index) =>
     index === count - 1
       ? "1"
       : String(
           Math.round(
-            springPosition(spring, (index / (count - 1)) * seconds) * 10_000
+            springPosition(spring, (index / (count - 1)) * spring.duration) *
+              10_000
           ) / 10_000
         )
   );
   const timing = {
-    duration: Math.round(seconds * 1000),
+    duration: Math.round(spring.duration * 1000),
     easing: `linear(${stops.join(", ")})`,
   };
   timings.set(key, timing);

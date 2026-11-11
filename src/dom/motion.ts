@@ -2,10 +2,14 @@ import { measureInk } from "@/dom/ink";
 import type { Ink } from "@/dom/ink";
 import { springTiming } from "@/transition/spring";
 import type { Spring } from "@/transition/spring";
-import { fadeSpring, numericText, offsetSpring } from "@/transition/swiftui";
+import {
+  fadeSpring,
+  layoutSpring,
+  numericText,
+  offsetSpring,
+} from "@/transition/swiftui";
 
 export interface Change {
-  delay: number;
   entering?: HTMLSpanElement;
   from: number;
   leaving?: HTMLSpanElement;
@@ -17,32 +21,45 @@ interface Step extends Ink {
   delay: number;
 }
 
+const sequenceSeconds = Math.max(fadeSpring.duration, offsetSpring.duration);
+
 const reducedMotion = () =>
   typeof matchMedia === "function" &&
   matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const steps = (
-  changes: readonly Change[],
-  glyphOf: (change: Change) => HTMLSpanElement | undefined
-): Step[] => {
-  const timed = changes.flatMap((change) => {
-    const glyph = glyphOf(change);
-    return glyph ? [{ delay: change.delay, glyph }] : [];
-  });
-  return measureInk(timed.map(({ glyph }) => glyph)).map((ink, index) => ({
+const sequence = (glyphs: HTMLSpanElement[], rtl: boolean): Step[] => {
+  const spacing =
+    glyphs.length < 2
+      ? 0
+      : Math.min(
+          numericText.sequenceBegin,
+          (sequenceSeconds * (1 / numericText.sequenceLength - 1)) /
+            (glyphs.length - 1)
+        );
+  const ordered = glyphs
+    .map((glyph) => ({ glyph, left: glyph.getBoundingClientRect().left }))
+    .toSorted((a, b) => (rtl ? b.left - a.left : a.left - b.left))
+    .map(({ glyph }) => glyph);
+  return measureInk(ordered).map((ink, index) => ({
     ...ink,
-    delay: timed[index]?.delay ?? 0,
+    delay: sequenceSeconds * index * spacing * 1000,
   }));
 };
 
 export const animateChanges = (
   changes: readonly Change[],
-  countsDown: boolean
+  { countsDown, rtl }: { countsDown: boolean; rtl: boolean }
 ) => {
   const motion = !reducedMotion();
   const travel = countsDown ? -numericText.offset : numericText.offset;
-  const entering = steps(changes, ({ entering: glyph }) => glyph);
-  const leaving = steps(changes, ({ leaving: glyph }) => glyph);
+  const entering = sequence(
+    changes.flatMap(({ entering: glyph }) => (glyph ? [glyph] : [])),
+    rtl
+  );
+  const leaving = sequence(
+    changes.flatMap(({ leaving: glyph }) => (glyph ? [glyph] : [])),
+    rtl
+  );
 
   const animate = (
     element: HTMLElement,
@@ -97,7 +114,11 @@ export const animateChanges = (
 
   return [
     ...changes.map(({ from, slot, to }) =>
-      animate(slot, [{ width: `${from}px` }, { width: `${to}px` }], fadeSpring)
+      animate(
+        slot,
+        [{ width: `${from}px` }, { width: `${to}px` }],
+        layoutSpring
+      )
     ),
     ...entering.flatMap((step) => glyphAnimations(step, true)),
     ...leaving.flatMap((step) => glyphAnimations(step, false)),
