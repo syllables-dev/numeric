@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Numeric showcase</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #fff;
+        cursor: none;
+      }
+
+      #stage {
+        position: absolute;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        transform-origin: 0 0;
+      }
+
+      #window {
+        position: absolute;
+        left: -422px;
+        top: 384px;
+        width: 1814px;
+        height: 976px;
+        overflow: hidden;
+        border-radius: 28px;
+        box-shadow:
+          0 40px 80px rgb(0 0 0 / 10%),
+          0 12px 36px rgb(0 0 0 / 24%);
+      }
+
+      iframe {
+        width: 1512px;
+        height: 813px;
+        border: 0;
+        transform: scale(1.2);
+        transform-origin: 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="window">
+        <iframe src="{{page}}" title="Vault"></iframe>
+      </div>
+    </div>
+    <script>
+      const stage = document.querySelector("#stage");
+      const window_ = document.querySelector("#window");
+      const frame = document.querySelector("iframe");
+      const chunks = [];
+
+      const countdown = () =>
+        frame.contentDocument?.querySelector(
+          ".max-md\\:hidden [data-slot=release-countdown]"
+        );
+
+      window.showcase = {
+        chunk: async (index) => {
+          const bytes = new Uint8Array(await chunks[index].arrayBuffer());
+          let binary = "";
+          for (let offset = 0; offset < bytes.length; offset += 32_768) {
+            binary += String.fromCharCode(...bytes.subarray(offset, offset + 32_768));
+          }
+          return btoa(binary);
+        },
+        ready: () => Boolean(countdown()?.querySelector("[aria-hidden]")),
+        record: async ({ duration, lead, rollover, rolloverLead }) => {
+          const style = frame.contentDocument.createElement("style");
+          style.textContent =
+            "nextjs-portal { display: none !important; } * { cursor: none !important; }";
+          frame.contentDocument.head.append(style);
+          const box = countdown().getBoundingClientRect();
+          window_.style.left = `${960 - (box.left + box.width / 2) * 1.2}px`;
+          window_.style.top = `${540 - (box.top + box.height / 2) * 1.2}px`;
+          const stream = await navigator.mediaDevices.getDisplayMedia({
+            preferCurrentTab: true,
+            video: { cursor: "never", frameRate: 60 },
+          });
+          frame.contentWindow.dateShift =
+            rollover - (Date.now() + lead + duration - rolloverLead);
+          await new Promise((resolve) => setTimeout(resolve, lead));
+          const fit = Math.min(innerWidth / 1920, innerHeight / 1080);
+          const left = (innerWidth - 1920 * fit) / 2;
+          const top = (innerHeight - 1080 * fit) / 2;
+          stage.style.transform = `translate(${left}px, ${top}px) scale(${fit})`;
+          const crop = {
+            height: Math.floor((1080 * fit * devicePixelRatio) / 2) * 2,
+            width: Math.floor((1920 * fit * devicePixelRatio) / 2) * 2,
+            x: Math.round(left * devicePixelRatio),
+            y: Math.round(top * devicePixelRatio),
+          };
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const recorder = new MediaRecorder(stream, {
+            mimeType: "video/mp4;codecs=avc1.640033",
+            videoBitsPerSecond: 80_000_000,
+          });
+          recorder.addEventListener("dataavailable", ({ data }) => chunks.push(data));
+          const stopped = new Promise((resolve) =>
+            recorder.addEventListener("stop", resolve)
+          );
+          recorder.start(1000);
+          await new Promise((resolve) => setTimeout(resolve, duration));
+          recorder.stop();
+          await stopped;
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          return { chunks: chunks.length, crop };
+        },
+      };
+    </script>
+  </body>
+</html>
