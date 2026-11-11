@@ -1,10 +1,10 @@
+import { animateChanges } from "@/dom/motion";
+import type { Change } from "@/dom/motion";
 import { glyphElement, slotElement, widthOf } from "@/dom/slots";
 import type { Glyph, Slot } from "@/dom/slots";
 import { alignGlyphs, splitGlyphs } from "@/glyphs/align";
 import type { GlyphEdit } from "@/glyphs/align";
-import { springTiming } from "@/transition/spring";
-import type { SpringTiming } from "@/transition/spring";
-import { fadeSpring, numericText, offsetSpring } from "@/transition/swiftui";
+import { numericText } from "@/transition/swiftui";
 
 export interface NumericRun {
   className?: string;
@@ -17,14 +17,8 @@ export interface NumericTextOptions {
   countsDown?: boolean;
 }
 
-interface Change {
-  delay: number;
-  entering?: HTMLSpanElement;
-  from: number;
-  leaving?: HTMLSpanElement;
-  slot: HTMLSpanElement;
-  to: number;
-}
+const visuallyHidden =
+  "position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap";
 
 const toGlyphs = (value: NumericValue): Glyph[] =>
   (typeof value === "string" ? [{ text: value }] : value).flatMap(
@@ -42,10 +36,6 @@ const sameGlyphs = (slots: readonly Slot[], glyphs: readonly Glyph[]) =>
       slots[index]?.text === text && slots[index]?.className === className
   );
 
-const reducedMotion = () =>
-  typeof matchMedia === "function" &&
-  matchMedia("(prefers-reduced-motion: reduce)").matches;
-
 export class NumericText {
   private readonly glyphs = document.createElement("span");
   private readonly label = document.createElement("span");
@@ -61,8 +51,7 @@ export class NumericText {
     { countsDown = false }: NumericTextOptions = {}
   ) {
     this.countsDown = countsDown;
-    this.label.style.cssText =
-      "position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap";
+    this.label.style.cssText = visuallyHidden;
     this.label.textContent = plainText(value);
     this.glyphs.ariaHidden = "true";
     this.glyphs.style.whiteSpace = "pre";
@@ -91,7 +80,10 @@ export class NumericText {
       ),
       next
     );
-    this.animateChanges(changes);
+    this.animations = animateChanges(changes, {
+      countsDown: this.countsDown,
+      lineHeight: this.glyphs.getBoundingClientRect().height,
+    });
     this.cleanup = () => {
       for (const { entering, leaving, slot } of changes) {
         leaving?.remove();
@@ -155,66 +147,6 @@ export class NumericText {
       ...change,
       to: widthOf(change.entering),
     }));
-  }
-
-  private animateChanges(changes: Change[]) {
-    const motion = !reducedMotion();
-    const fade = springTiming(fadeSpring);
-    const rise = springTiming(offsetSpring);
-    const blur = `blur(${(numericText.blur * this.glyphs.getBoundingClientRect().height) / 2}px)`;
-    const travel = (this.countsDown ? -1 : 1) * numericText.offset * 100;
-    const hidden = motion
-      ? { filter: blur, opacity: 0, scale: numericText.scale }
-      : { opacity: 0 };
-    const shown = motion
-      ? { filter: "blur(0px)", opacity: 1, scale: 1 }
-      : { opacity: 1 };
-
-    const animate = (
-      element: HTMLElement,
-      keyframes: Keyframe[],
-      timing: SpringTiming,
-      delay = 0
-    ) => {
-      this.animations.push(
-        element.animate(keyframes, {
-          delay,
-          duration: motion ? timing.duration : 150,
-          easing: motion ? timing.easing : "linear",
-          fill: "both",
-        })
-      );
-    };
-
-    for (const { delay, entering, from, leaving, slot, to } of changes) {
-      animate(slot, [{ width: `${from}px` }, { width: `${to}px` }], fade);
-
-      if (entering) {
-        animate(entering, [hidden, shown], fade, delay);
-      }
-
-      if (leaving) {
-        animate(leaving, [shown, hidden], fade, delay);
-      }
-
-      if (motion && entering) {
-        animate(
-          entering,
-          [{ translate: `0 ${travel}%` }, { translate: "0 0" }],
-          rise,
-          delay
-        );
-      }
-
-      if (motion && leaving) {
-        animate(
-          leaving,
-          [{ translate: "0 0" }, { translate: `0 ${-travel}%` }],
-          rise,
-          delay
-        );
-      }
-    }
   }
 
   private async settleWhenFinished() {
