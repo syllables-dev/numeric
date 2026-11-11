@@ -55,4 +55,4 @@ const seconds = new NumericText(element, "10 sec", { countsDown: true });
 seconds.update("9 sec");
 ```
 
-Read the [documentation](https://docs.syllables.dev/packages/numeric) for styled runs, directions, and how the motion matches iOS.
+Read the [documentation](https://docs.syllables.dev/packages/numeric) for styled runs, directions, and the full API.
