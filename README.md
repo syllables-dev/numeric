@@ -1,16 +1,14 @@
-# Numeric
+# numeric
 
-Faithful SwiftUI numeric text on the web.
+Faithful SwiftUI numeric text on the web, for React, Vue, Svelte, and the DOM.
 
-## Quick start
-
-Install:
+## Install
 
 ```sh
 bun add @syllables-dev/numeric
 ```
 
-React:
+## Usage
 
 ```tsx
 import { NumericText } from "@syllables-dev/numeric/react";
@@ -20,39 +18,16 @@ export const Seconds = ({ seconds }: { seconds: number }) => (
 );
 ```
 
-Vue:
+Full documentation lives at [docs.syllables.dev/packages/numeric](https://docs.syllables.dev/packages/numeric).
 
-```vue
-<script setup lang="ts">
-import { NumericText } from "@syllables-dev/numeric/vue";
+## Development
 
-defineProps<{ seconds: number }>();
-</script>
-
-<template>
-  <NumericText counts-down :value="`${seconds} sec`" />
-</template>
+```sh
+bun install
+bun run check
+bun run typecheck
 ```
 
-Svelte:
+## License
 
-```svelte
-<script lang="ts">
-  import { numericText } from "@syllables-dev/numeric/svelte";
-
-  let { seconds }: { seconds: number } = $props();
-</script>
-
-<span use:numericText={{ countsDown: true, value: `${seconds} sec` }}></span>
-```
-
-DOM:
-
-```ts
-import { NumericText } from "@syllables-dev/numeric";
-
-const seconds = new NumericText(element, "10 sec", { countsDown: true });
-seconds.update("9 sec");
-```
-
-Read the [documentation](https://docs.syllables.dev/packages/numeric) for styled runs, directions, and the full API.
+MIT
